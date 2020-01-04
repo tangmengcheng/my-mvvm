@@ -1,6 +1,6 @@
 # my-mvvm
 从零实现一套基于Vue的MVVM原理
-从零手写基于Vue的MVVM原理
+从零手写一套完整的基于Vue的MVVM原理
 
 MVVM 双向数据绑定  angular 脏值检测  vue 数据劫持+发布订阅
 不兼容IE8以下的低版本  ES5里的Object.defineProperty()
@@ -19,3 +19,12 @@ Object.defineProperty(obj, 'tmc', {
     }
     // 注意：当出现get,set函数时，不能出现writable, enumerable属性
 })
+
+发布订阅模式  先订阅 再有发布
+Object.defineProperty()
+数据劫持 Observe
+数据代理
+模板编译Compile
+发布订阅
+连接视图与数据
+实现computed
