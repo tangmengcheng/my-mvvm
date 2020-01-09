@@ -6,7 +6,7 @@
 ![图片alt](https://user-gold-cdn.xitu.io/2018/7/25/164cde63a9070a28?imageView2/0/w/1280/h/960/format/webp/ignore-error/1 '加油')
 
 ## MVVM是什么
-在了解MVVM之前，我们来对MVC说明一下。MVC架构起初以及现在一直存在于后端，以Java为例。MVC分别代表后台的三层，M代表模型层、V代表视图层、C代表控制器层，这三层架构完全可以满足于绝大分部的业务需求开发。
+在了解MVVM之前，我们来对MVC说明一下。MVC架构起初以及现在一直存在于后端。以Java为例，MVC分别代表后台的三层，M代表模型层、V代表视图层、C代表控制器层，这三层架构完全可以满足于绝大分部的业务需求开发。
 ![图片alt](https://user-gold-cdn.xitu.io/2017/11/3/24c32d90d20161bd813bc80e73aaae29?imageView2/0/w/1280/h/960/format/webp/ignore-error/1 'MVC模式')
 > MVC & 三层架构
 
@@ -43,9 +43,9 @@ MVVM 设计模式，是由 MVC（最早来源于后端）、MVP 等设计模式�
 > 介绍一下 Object.defineProperty 的使用
 
 Object.defineProperty(obj, prop, desc) 的作用就是直接在一个对象上定义一个新属性，或者修改一个已经存在的属性
-1. obj 需要定义属性的当前对象
-2. prop 当前需要定义的属性名
-3. desc 属性描述符
+1. obj: 需要定义属性的当前对象
+2. prop: 当前需要定义的属性名
+3. desc: 属性描述符
 
 注意：一般通过为对象的属性赋值的情况下，对象的属性可以修改也可以删除，但是通过Object.defineProperty()定义属性，通过描述符的设置可以进行更精准的控制对象属性。
 ![图片alt](https://user-gold-cdn.xitu.io/2020/1/9/16f89758b3f2f7c7?w=484&h=263&f=png&s=5980 '属性描述符')
@@ -66,15 +66,273 @@ Object.defineProperty(obj, 'name', {
 })
 ```
 
-注意：当出现get,set函数时，不能同时出现writable, enumerable属性，否则系统报错。
+注意：当出现get,set函数时，不能同时出现writable, enumerable属性，否则系统报错。并且该API不支持IE8以下的版本，也就是Vue不兼容IE8以下的浏览器。
 > 介绍一下 发布订阅模式
-## 实现自己的 MVVM
 
+发布者-订阅者模式也叫观察者模式。他定义了一种一对多的依赖关系，即当一个对象的状态发生改变时，所有依赖于他的对象都会得到通知并自动更新，解决了主体对象与观察者之间功能的耦合。
+```
+// 发布订阅模式  先有订阅后有发布
+function Dep() {
+    this.subs = [];
+}
+// 订阅
+Dep.prototype.addSub = function(sub) {
+    this.subs.push(sub);
+}
+Dep.prototype.notify = function() {
+    this.subs.forEach(sub => sub.update());
+}
+// Watcher类，通过这个类创建的实例都有update方法
+function Watcher(fn) {
+    this.fn = fn;
+}
+Watcher.prototype.update = function() {
+    this.fn();
+}
+let watcher1 = new Watcher(function() {
+    console.log(123);
+})
+let watcher2 = new Watcher(function() {
+    console.log(456);
+})
+let dep = new Dep();
+dep.addSub(watcher1); // 将watcher放到了数组中
+dep.addSub(watcher2);
+dep.notify();
+
+// 控制台输出：
+// 123 456
+```
+![图片alt](https://user-gold-cdn.xitu.io/2020/1/10/16f8b3976358f886?w=240&h=227&f=gif&s=15826 '学不动了')
+
+## 实现自己的 MVVM
+> 在项目根目录创建一个index.html模板并引入自己手动创建的MVVM.js文件
+```
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+</head>
+<body>
+    <div id="app">
+        <input type="text" v-modal="obj.name">
+        <span>{{ obj.name }}</span>
+        <span>{{obj.age}}</span>
+    </div>
+    <script src="./MVVM.js"></script>
+    <script>
+        let vm = new Vue({
+            el: '#app',
+            data: {
+                obj: {
+                    name: 'tmc',
+                    age: 25
+                }
+            }
+        })
+    </script>
+</body>
+</html>
+```
 ### 数据劫持
+通过Object.defineProperty()来劫持对象属性的setter和getter操作，在数据变动时触发相应的监听回调函数。
+```
+// 数据劫持
+class Observer {
+    constructor(data) {
+        this.observer(data);
+    }
+    observer(data) {
+        if(data && typeof data == 'object') {
+            // 判断data数据存在 并 data是对象  才观察
+            for(let key in data) {
+                this.defineReactive(data, key, data[key]);
+            }
+        }
+    }
+    defineReactive(obj, key, value) {
+        this.observer(value); // 如果value还是对象，还需要观察
+        Object.defineProperty(obj, key, {
+            get() {
+                return value;
+            },
+            set:(newVal) => { // 设置新值
+                if(newVal != value) { // 新值和就值如果一致就不需要替换了
+                    this.observer(newVal); // 如果赋值的也是对象的话  还需要观察
+                    value = newVal;
+                }
+            }
+        })
+    }
+}
+```
 ### 数据代理
+数据代理就是让我们每次拿data里的数据时，不用每次都写一长串，如mvvm._data.a.b这种，我们其实可以直接写成mvvm.a.b这种显而易见的方式
 ### 模板编译
+```
+// 模板编译
+class Compiler {
+    /**
+     * @param {*} el 元素 注意：el选项中有可能是‘#app’字符串也有可能是document.getElementById('#app')
+     * @param {*} vm 实例
+     */
+    constructor(el, vm) {
+        // 判断el属性  是不是一个元素  如果不是元素就获取
+        this.el = this.isElementNode(el) ? el : document.querySelector(el);
+        // console.log(this.el);拿到当前的模板
+        this.vm = vm;
+        // 把当前节点中的元素获取到  放到内存中  防止页面重绘
+        let fragment = this.node2fragment(this.el);
+        // console.log(fragment);内存中所有的节点
+
+        // 1. 编译模板 用data中的数据编译
+        this.compile(fragment);
+        // 2. 把内存中的内容进行替换
+        this.el.appendChild(fragment);
+        // 3. 再把替换后的内容回写到页面中
+    }
+    /**
+     * 判断是含有指令
+     * @param {*} attrName 属性名 type v-modal
+     */
+    isDirective(attrName) {
+        return attrName.startsWith('v-'); // 是否含有v-
+    }
+    /**
+     * 编译元素节点
+     * @param {*} node 元素节点
+     */
+    compileElement(node) {
+        // 获取当前元素节点的属性；【类数组】NamedNodeMap; 也存在没有属性，则NamedNodeMap{length: 0}
+        let attributes = node.attributes;
+        [...attributes].forEach(attr => {
+            // attr格式：type="text"  v-modal="obj.name"
+            let {name, value: expr} = attr;
+            // 判断是不是指令
+            if(this.isDirective(name)) { // v-modal v-html v-bind
+                // console.log('element', node); 元素
+                let [, directive] = name.split('-'); // 获取指令名
+                // 需要调用不同的指令来处理
+                CompilerUtil[directive](node, expr, this.vm);
+            }
+        });
+    }
+    /**
+     * 编译文本节点 判断当前文本节点中的内容是否含有 {{}}
+     * @param {*} node 文本节点
+     */
+    compileText(node) {
+        let content = node.textContent;
+        // console.log(content, ‘内容’); 元素里的内容
+        if(/\{\{(.+?)\}\}/.test(content)) { // 通过正则去匹配只需要含有{{}}大括号的，空的不需要 获取大括号中间的内容
+            // console.log(content, ‘内容’); 只包含{{}} 不需要空的 和其他没有{{}}的子元素
+            CompilerUtil['text'](node, content, this.vm);
+        }
+    }
+    /**
+     * 编译内存中的DOM节点
+     * @param {*} fragmentNode 文档碎片
+     */
+    compile(fragmentNode) {
+        // 从文档碎片中拿到子节点  注意：childNodes【之包含第一层，不包含{{}}等】
+        let childNodes = fragmentNode.childNodes; // 获取的是类数组NodeLis
+        [...childNodes].forEach(child => {
+            // 是否是元素节点
+            if (this.isElementNode(child)) {
+                // console.log('element', child);
+                this.compileElement(child);
+                // 如果是元素的话  需要把自己传进去  再去遍历子节点   递归
+                this.compile(child);
+            } else {
+                // 文本节点
+                // console.log('text', child);
+                this.compileText(child);
+            }
+        });
+    }
+    /**
+     * 将节点中的元素放到内存中
+     * @param {*} node 节点
+     */
+    node2fragment(node) {
+        // 创建一个稳定碎片；目的是为了将这个节点中的每个孩子都写到这个文档碎片中
+        let fragment = document.createDocumentFragment();
+        let firstChild; // 这个节点中的第一个孩子
+        while (firstChild = node.firstChild) {
+            // appendChild具有移动性，每移动一个节点到内存中，页面上就会少一个节点
+            fragment.appendChild(firstChild);
+        }
+        return fragment;
+    }
+    /**
+     * 判断是不是元素
+     * @param {*} node 当前这个元素的节点
+     */
+    isElementNode(node) {
+        return node.nodeType === 1;
+    }
+}
+```
 ### 发布订阅
+发布订阅主要靠的就是数组关系，订阅就是放入函数，发布就是让数组里的函数执行
+```
+// 发布订阅
+function Dep() { 
+    this.subs = []
+}
+Dep.prototype.addSub = function(sub) {
+    this.subs.push(sub)
+}
+Dep.prototype.notify = function() {
+    this.subs.forEach(sub => sub.update())
+}
+// watcher
+function Watcher(vm, exp, fn) { 
+    this.fn = fn;
+    this.vm = vm;
+    this.exp = exp; // 添加到订约中
+    Dep.target = this;
+    let val = vm;
+    let arr = exp.split('.');
+    arr.forEach(function (k) { 
+        val = val[k];
+    })
+    Dep.target = null;
+}
+Watcher.prototype.update = function() {
+    let val = this.vm;
+    let arr = this.exp.split('.');
+    arr.forEach(function (k) { 
+        val = val[k];
+    })
+    this.fn(val)
+}
+```
 ### 连接视图与数据
 ### 实现computed
-
+```
+function initComputed() {
+    let vm = this;
+    let computed = this.$options.computed;  // 从options上拿到computed属性   {sum: ƒ, noop: ƒ}
+    // 得到的都是对象的key可以通过Object.keys转化为数组
+    Object.keys(computed).forEach(key => {  // key就是sum,noop
+        Object.defineProperty(vm, key, {
+            // 这里判断是computed里的key是对象还是函数
+            // 如果是函数直接就会调get方法
+            // 如果是对象的话，手动调一下get方法即可
+            // 如： sum() {return this.a + this.b;},他们获取a和b的值就会调用get方法
+            // 所以不需要new Watcher去监听变化了
+            get: typeof computed[key] === 'function' ? computed[key] : computed[key].get,
+            set() {}
+        });
+    });
+}
+```
+## 完整的仓库地址
+> http://
 ## 总结
+通过以下描述和核心代码的演示，相信小伙伴们对MVVM有重新的认识，面试中对面面试官的提问可以对答如流。
+![图片alt](https://user-gold-cdn.xitu.io/2020/1/9/16f8630237583f32?w=780&h=519&f=jpeg&s=91038 '加油')

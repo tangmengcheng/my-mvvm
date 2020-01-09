@@ -26,7 +26,7 @@ class Observer {
         })
     }
 }
-// 编译
+// 模板编译
 class Compiler {
     /**
      * @param {*} el 元素 注意：el选项中有可能是‘#app’字符串也有可能是document.getElementById('#app')
