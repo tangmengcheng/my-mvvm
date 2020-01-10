@@ -1,9 +1,8 @@
-从零手写一套基于Vue的完整的MVVM原理
 作为前端面试官我面试必须问一下面试者：给我描述一下你对MVVM的理解？
 
 接下来，我将从零实现一套基于Vue的完整的MVVM，提供给来年“金三银四”跳槽高峰期的小伙伴们阅读也详细梳理一下自己对MVVM的理解。
 
-![图片alt](https://user-gold-cdn.xitu.io/2018/7/25/164cde63a9070a28?imageView2/0/w/1280/h/960/format/webp/ignore-error/1 '加油')
+![图片alt](https://user-gold-cdn.xitu.io/2018/7/25/164cde63a9070a28?imageView2/0/w/1280/h/960/format/webp/ignore-error/1 'MVVM')
 
 ## MVVM是什么
 在了解MVVM之前，我们来对MVC说明一下。MVC架构起初以及现在一直存在于后端。以Java为例，MVC分别代表后台的三层，M代表模型层、V代表视图层、C代表控制器层，这三层架构完全可以满足于绝大分部的业务需求开发。
@@ -29,7 +28,7 @@ MVVM 设计模式，是由 MVC（最早来源于后端）、MVP 等设计模式�
 > 常见库实现数据双向绑定的做法：
 - 发布订阅模式（Backbone.js）
 - 脏值检查（Angular.js）
-- 数据接触（Vue.js）
+- 数据劫持（Vue.js）
 
 面试者在回答Vue的双向数据绑定原理时，几乎所有人都会说：Vue是采用数据劫持结合发布订阅模式，通过Object.defineProperty()来劫持各个属性的getter,setter, 在数据变动时发布消息给订阅者，触发相应的回调函数，从而实现数据双向绑定。但当继续深入问道：
 - 实现一个MVVM里面需要那些核心模块？
@@ -106,39 +105,19 @@ dep.notify();
 ![图片alt](https://user-gold-cdn.xitu.io/2020/1/10/16f8b3976358f886?w=240&h=227&f=gif&s=15826 '学不动了')
 
 ## 实现自己的 MVVM
-> 在项目根目录创建一个index.html模板并引入自己手动创建的MVVM.js文件
-```
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>Document</title>
-</head>
-<body>
-    <div id="app">
-        <input type="text" v-modal="obj.name">
-        <span>{{ obj.name }}</span>
-        <span>{{obj.age}}</span>
-    </div>
-    <script src="./MVVM.js"></script>
-    <script>
-        let vm = new Vue({
-            el: '#app',
-            data: {
-                obj: {
-                    name: 'tmc',
-                    age: 25
-                }
-            }
-        })
-    </script>
-</body>
-</html>
-```
-### 数据劫持
-通过Object.defineProperty()来劫持对象属性的setter和getter操作，在数据变动时触发相应的监听回调函数。
+
+MVVM作为数据绑定的入口，整合Observer、Compile和Watcher三者，通过Observer来监听自己的model数据变化，通过Compile来解析编译模板指令，最终利用Watcher搭起Observer和Compile之间的通信桥梁，达到数据变化 -> 视图更新；视图交互变化(input) -> 数据model变更的双向绑定效果。
+> 整理了一下，要实现mvvm的双向绑定，就必须要实现以下几点：
+
+1. 实现一个数据劫持Observer，能够对数据对象的所有属性进行监听，如有变动可拿到最新值并通知订阅者
+2. 实现一个模板编译Compile，对每个元素节点的指令进行扫描和解析，根据指令模板替换数据，以及绑定相应的更新函数
+3. 实现一个Watcher，作为连接Observer和Compile的桥梁，能够订阅并收到每个属性变动的通知，执行指令绑定的相应回调函数，从而更新视图
+4. mvvm入口函数，整合以上三者
+
+![图片alt](https://user-gold-cdn.xitu.io/2020/1/10/16f8d664a54cb58a?w=730&h=390&f=png&s=9260 'MVVM流程')
+
+### 数据劫持 - Observer
+vue.js 则是采用数据劫持结合发布者-订阅者模式的方式，通过Object.defineProperty()来劫持各个属性的setter，getter，在数据变动时发布消息给订阅者，触发相应的监听回调。
 ```
 // 数据劫持
 class Observer {
@@ -169,9 +148,8 @@ class Observer {
     }
 }
 ```
-### 数据代理
-数据代理就是让我们每次拿data里的数据时，不用每次都写一长串，如mvvm._data.a.b这种，我们其实可以直接写成mvvm.a.b这种显而易见的方式
-### 模板编译
+### 模板编译 - Compiler
+compile主要做的事情是解析模板指令，将模板中的变量替换成数据，然后初始化渲染页面视图，并将每个指令对应的节点绑定更新函数，添加监听数据的订阅者，一旦数据有变动，收到通知，更新视图.
 ```
 // 模板编译
 class Compiler {
@@ -276,8 +254,13 @@ class Compiler {
     }
 }
 ```
-### 发布订阅
+### 发布订阅 - Watcher
 发布订阅主要靠的就是数组关系，订阅就是放入函数，发布就是让数组里的函数执行
+> Watcher订阅者作为Observer和Compile之间通信的桥梁，主要做的事情是:
+1. 在自身实例化时往属性订阅器(dep)里面添加自己
+2. 自身必须有一个update()方法
+3. 待属性变动dep.notice()通知时，能调用自身的update()方法，并触发Compile中绑定的回调，则功成身退。
+
 ```
 // 发布订阅
 function Dep() { 
@@ -311,8 +294,18 @@ Watcher.prototype.update = function() {
     this.fn(val)
 }
 ```
-### 连接视图与数据
-### 实现computed
+### 整合 - MVVM
+> 数据代理
+
+从代码中可看出监听的数据对象是options.data，每次需要更新视图，则必须通过var vm = new MVVM({data:{name: 'kindeng'}}); vm._data.name = 'dmq'; 这样的方式来改变数据。
+
+显然不符合我们一开始的期望，我们所期望的调用方式应该是这样的：
+var vm = new MVVM({data: {name: 'kindeng'}}); vm.name = 'dmq';
+
+所以这里需要给MVVM实例添加一个属性代理的方法，使访问vm的属性代理为访问vm._data的属性，改造后的代码如下：这里主要还是利用了Object.defineProperty()这个方法来劫持了vm实例对象的属性的读写权，使读写vm实例的属性转成读写了vm._data的属性值，达到鱼目混珠的效果。
+数据代理就是让我们每次拿data里的数据时，不用每次都写一长串，如mvvm._data.a.b这种，我们其实可以直接写成mvvm.a.b这种显而易见的方式
+
+### 扩展 - 实现computed
 ```
 function initComputed() {
     let vm = this;
@@ -334,5 +327,5 @@ function initComputed() {
 ## 完整的仓库地址
 > http://
 ## 总结
-通过以下描述和核心代码的演示，相信小伙伴们对MVVM有重新的认识，面试中对面面试官的提问可以对答如流。
+通过以下描述和核心代码的演示，相信小伙伴们对MVVM有重新的认识，面试中对面面试官的提问可以对答如流。希望同行的小伙伴手动敲一遍，实现一个自己MVVM，这样对其原理理解更加深入。
 ![图片alt](https://user-gold-cdn.xitu.io/2020/1/9/16f8630237583f32?w=780&h=519&f=jpeg&s=91038 '加油')
