@@ -1,11 +1,11 @@
-作为前端面试官我面试必须问一下面试者：给我描述一下你对MVVM的理解？
+作为前端面试官我面试必须问一下面试者：描述一下你对MVVM的理解？
 
-接下来，我将从零实现一套基于Vue的完整的MVVM，提供给来年“金三银四”跳槽高峰期的小伙伴们阅读也详细梳理一下自己对MVVM的理解。
+接下来，我将从零实现一套完整的基于Vue的MVVM，提供给来年“金三银四”跳槽高峰期的小伙伴们阅读也详细梳理一下自己对MVVM的理解。
 
 ![图片alt](https://user-gold-cdn.xitu.io/2018/7/25/164cde63a9070a28?imageView2/0/w/1280/h/960/format/webp/ignore-error/1 'MVVM')
 
 ## MVVM是什么
-在了解MVVM之前，我们来对MVC说明一下。MVC架构起初以及现在一直存在于后端。以Java为例，MVC分别代表后台的三层，M代表模型层、V代表视图层、C代表控制器层，这三层架构完全可以满足于绝大分部的业务需求开发。
+在了解MVVM之前，我们来对MVC说明一下。MVC架构起初以及现在一直存在于后端。MVC分别代表后台的三层，M代表模型层、V代表视图层、C代表控制器层，这三层架构完全可以满足于绝大分部的业务需求开发。
 ![图片alt](https://user-gold-cdn.xitu.io/2017/11/3/24c32d90d20161bd813bc80e73aaae29?imageView2/0/w/1280/h/960/format/webp/ignore-error/1 'MVC模式')
 > MVC & 三层架构
 
@@ -23,7 +23,7 @@ MVVM 设计模式，是由 MVC（最早来源于后端）、MVP 等设计模式�
 2. VM - 视图模型（ViewModel），连接Model与View
 3. V - 视图层（View），呈现给用户的DOM渲染界面
 ![图片alt](https://user-gold-cdn.xitu.io/2018/5/7/16339e3e3f24873d?imageView2/0/w/1280/h/960/format/webp/ignore-error/1 'MVVM模式')
-通过以上的MVVM模式图，我们可以看出最核心的就是ViewModel，它主要的作用：对View中DOM元素的监听和对Model中的数据进行绑定，当View变化会改动Modal中数据的改动，Model中数据的改动会触发View视图重新渲染，从而达到数据双向绑定的效果，该效果也是Vue最为核心的特性。
+通过以上的MVVM模式图，我们可以看出最核心的就是ViewModel，它主要的作用：对View中DOM元素的监听和对Model中的数据进行绑定，当View变化会引起Modal中数据的改动，Model中数据的改动会触发View视图重新渲染，从而达到数据双向绑定的效果，该效果也是Vue最为核心的特性。
 
 > 常见库实现数据双向绑定的做法：
 - 发布订阅模式（Backbone.js）
@@ -34,6 +34,7 @@ MVVM 设计模式，是由 MVC（最早来源于后端）、MVP 等设计模式�
 - 实现一个MVVM里面需要那些核心模块？
 - 为什么操作DOM要在内存上进行？
 - 各个核心模块之间的关系是怎样的？
+- Vue中如何对数组进行数据劫持？
 - 你自己手动完整的实现过一个MVVM吗？
 - ...
 ![图片alt](https://user-gold-cdn.xitu.io/2020/1/9/16f8903d81d38466?w=223&h=223&f=jpeg&s=5750 'why?')
@@ -66,9 +67,14 @@ Object.defineProperty(obj, 'name', {
 ```
 
 注意：当出现get,set函数时，不能同时出现writable, enumerable属性，否则系统报错。并且该API不支持IE8以下的版本，也就是Vue不兼容IE8以下的浏览器。
+
+> DocumentFragment - 文档碎片
+
+DocumentFragment 表示文档片段，它不属于 DOM 树，但是它可以存储 DOM，并且可以将所存储的 DOM 加入到指定的 DOM 节点中去。那么有人要问了，那要它何用，直接把元素加入到 DOM 中不就可以了吗？用它的原因在于，使用它操作 DOM 要比直接操作 DOM 性能要高很多。
+
 > 介绍一下 发布订阅模式
 
-发布者-订阅者模式也叫观察者模式。他定义了一种一对多的依赖关系，即当一个对象的状态发生改变时，所有依赖于他的对象都会得到通知并自动更新，解决了主体对象与观察者之间功能的耦合。
+发布者-订阅者模式定义了一种一对多的依赖关系，即当一个对象的状态发生改变时，所有依赖于他的对象都会得到通知并自动更新，解决了主体对象与观察者之间功能的耦合。以下是一个发布订阅模式的小例子，实际上可以理解为靠的就是数组关系，订阅就是放入函数，发布就是让数组里的函数执行。
 ```
 // 发布订阅模式  先有订阅后有发布
 function Dep() {
@@ -102,28 +108,26 @@ dep.notify();
 // 控制台输出：
 // 123 456
 ```
+
 ![图片alt](https://user-gold-cdn.xitu.io/2020/1/10/16f8b3976358f886?w=240&h=227&f=gif&s=15826 '学不动了')
 
 ## 实现自己的 MVVM
-
-MVVM作为数据绑定的入口，整合Observer、Compile和Watcher三者，通过Observer来监听自己的model数据变化，通过Compile来解析编译模板指令，最终利用Watcher搭起Observer和Compile之间的通信桥梁，达到数据变化 -> 视图更新；视图交互变化(input) -> 数据model变更的双向绑定效果。
 > 要实现mvvm的双向绑定，就必须要实现以下几点：
 
 1. 实现一个数据劫持 - Observer，能够对数据对象的所有属性进行监听，如有变动可拿到最新值并通知订阅者
-2. 实现一个模板编译 - Compile，对每个元素节点的指令进行扫描和解析，根据指令模板替换数据，以及绑定相应的更新函数
+2. 实现一个模板编译 - Compiler，对每个元素节点的指令进行扫描和解析，根据指令模板替换数据，以及绑定相应的更新函数
 3. 实现一个 - Watcher，作为连接Observer和Compile的桥梁，能够订阅并收到每个属性变动的通知，执行指令绑定的相应回调函数，从而更新视图
 4. MVVM 作为入口函数，整合以上三者
 
 ![图片alt](https://user-gold-cdn.xitu.io/2020/1/10/16f8d664a54cb58a?w=730&h=390&f=png&s=9260 'MVVM流程')
 
 ### 数据劫持 - Observer
-> Observer 类主要目的就是给 data 数据内的所有层级的数据都进行数据劫持
-
-vue.js 则是采用数据劫持结合发布者-订阅者模式的方式，通过Object.defineProperty()来劫持各个属性的setter，getter，在数据变动时发布消息给订阅者，触发相应的监听回调。
+> Observer 类主要目的就是给 data 数据内的所有层级的数据都进行数据劫持，让其具备监听对象属性变化的能力
 
 【重点】：
 1. 当对象的属性值也是对象时，也要对其值进行劫持 --- 递归
 2. 当对象赋值与旧值一样，则不需要后续操作 --- 防止重复渲染
+3. 当模板渲染获取对象属性会调用get添加target，对象属性改动通知订阅者更新 --- 数据变化，视图更新
 ```
 // 数据劫持
 class Observer {
@@ -139,23 +143,39 @@ class Observer {
         }
     }
     defineReactive(obj, key, value) {
+        let dep = new Dep();
         this.observer(value); // 如果value还是对象，还需要观察
         Object.defineProperty(obj, key, {
             get() {
+                Dep.target && dep.addSub(Dep.target);
                 return value;
             },
             set:(newVal) => { // 设置新值
                 if(newVal != value) { // 新值和就值如果一致就不需要替换了
                     this.observer(newVal); // 如果赋值的也是对象的话  还需要观察
                     value = newVal;
+                    dep.notify(); // 通知所有订阅者更新了
                 }
             }
         })
     }
 }
 ```
+注意：该类只会对对象进行数据劫持，并不会对数组的监听。
 ### 模板编译 - Compiler
-compile主要做的事情是解析模板指令，将模板中的变量替换成数据，然后初始化渲染页面视图，并将每个指令对应的节点绑定更新函数，添加监听数据的订阅者，一旦数据有变动，收到通知，更新视图.
+> Compiler 是解析模板指令，将模板中的变量替换成数据，然后初始化渲染页面视图，并将每个指令对应的节点绑定更新函数，添加监听数据的订阅者，一旦数据有变动，收到通知，更新视图
+
+Compiler 主要做了三件事：
+- 将当前根节点所有子节点遍历放到内存中
+- 编译文档碎片，替换模板（元素、文本）节点中属性的数据
+- 将编译的内容回写到真实DOM上
+
+【重点】：
+
+1. 先把真实的 dom 移入到内存中操作 ---  文档碎片
+2. 编译 元素节点 和 文本节点
+3. 给模板中的表达式和属性添加观察者
+
 ```
 // 模板编译
 class Compiler {
@@ -192,6 +212,7 @@ class Compiler {
     compileElement(node) {
         // 获取当前元素节点的属性；【类数组】NamedNodeMap; 也存在没有属性，则NamedNodeMap{length: 0}
         let attributes = node.attributes;
+        // Array.from()、[...xxx]、[].slice.call 等都可以将类数组转化为真实数组
         [...attributes].forEach(attr => {
             // attr格式：type="text"  v-modal="obj.name"
             let {name, value: expr} = attr;
@@ -226,7 +247,6 @@ class Compiler {
         [...childNodes].forEach(child => {
             // 是否是元素节点
             if (this.isElementNode(child)) {
-                // console.log('element', child);
                 this.compileElement(child);
                 // 如果是元素的话  需要把自己传进去  再去遍历子节点   递归
                 this.compile(child);
@@ -259,9 +279,71 @@ class Compiler {
         return node.nodeType === 1;
     }
 }
+// 编译功能
+CompilerUtil = {
+    /**
+     * 根据表达式取到对应的数据
+     * @param {*} vm 
+     * @param {*} expr 
+     */
+    getVal(vm, expr) {
+        return expr.split('.').reduce((data, current) => {
+            return data[current];
+        }, vm.$data);
+    },
+    setVal(vm, expr, value) {
+        expr.split('.').reduce((data, current, index, arr) => {
+          if (index === arr.length - 1) {
+            return data[current] = value;
+          }
+          return data[current]
+        }, vm.$data)
+    },
+    /**
+     * 处理v-modal
+     * @param {*} node 对应的节点
+     * @param {*} expr 表达式
+     * @param {*} vm 当前实例
+     */
+    modal(node, expr, vm) {
+        // 给输入框赋予value属性 node.value = xxx
+        let fn = this.updater['modalUpdater'];
+        new Watcher(vm, expr, (newValue) => {//给输入框加一个观察者 数据更新会触发此方法 会拿新值给 输入框赋值
+          fn(node, newValue)
+        })
+        node.addEventListener('input', e => {
+          let value = e.target.value; // 获取用户输入的内容
+          this.setVal(vm, expr, value);
+        })
+        let value = this.getVal(vm, expr); // 返回tmc
+        fn(node, value);
+    },
+    text(node, expr, vm) {
+        let fn = this.updater['textUpdater'];
+        let content = expr.replace(/\{\{(.+?)\}\}/g, (...args) => {
+            // 给表达式 每个{{}} 加上观察者
+            new Watcher(vm, args[1], (newValue) => {
+                fn(node, this.getContentValue(vm, expr)); // 返回了一个新的字符串
+            })
+            return this.getVal(vm, args[1].trim());
+        });
+        fn(node, content);
+    },
+    updater: {
+        // 把数据插入到节点中
+        modalUpdater(node, value) {
+            node.value = value;
+        },
+        // 处理文本节点
+        textUpdater(node, value) {
+            node.textContent = value;
+        }
+    }
+}
 ```
+Complier 具备将 HTML 模版解析成 Document Fragment 的能力，并且会创建响应的 Watcher，让视图中绑定的数据产生变化。
+
 ### 发布订阅 - Watcher
-发布订阅主要靠的就是数组关系，订阅就是放入函数，发布就是让数组里的函数执行，上方有发布订阅Demo。
 > Watcher 订阅者作为 Observer 和 Compile 之间通信的桥梁，主要做的事情是:
 1. 在自身实例化时往属性订阅器(dep)里面添加自己
 2. 自身必须有一个update()方法
@@ -278,7 +360,12 @@ Dep.prototype.addSub = function(sub) {
 Dep.prototype.notify = function() {
     this.subs.forEach(sub => sub.update())
 }
-// watcher
+/**
+  * watcher
+  * @param {*} vm 当前实例
+  * @param {*} exp 表达式
+  * @param {*} fn 监听函数
+  */
 function Watcher(vm, exp, fn) { 
     this.fn = fn;
     this.vm = vm;
@@ -289,7 +376,7 @@ function Watcher(vm, exp, fn) {
     arr.forEach(function (k) { 
         val = val[k];
     })
-    Dep.target = null;
+    Dep.target = null; // 保证watcher不会重复添加
 }
 Watcher.prototype.update = function() {
     let val = this.vm;
@@ -300,38 +387,77 @@ Watcher.prototype.update = function() {
     this.fn(val)
 }
 ```
+Dep 和 Watcher 是简单的观察者模式的实现，Dep 即订阅者，它会管理所有的观察者，并且有给观察者发送消息的能力。Watcher 即观察者，当接收到订阅者的消息后，观察者会做出自己的更新操作。
 ### 整合 - MVVM
+MVVM作为数据绑定的入口，整合Observer、Compile和Watcher三者，通过Observer来监听自己的model数据变化，通过Compile来解析编译模板指令，最终利用Watcher搭起Observer和Compile之间的通信桥梁，达到数据变化 -> 视图更新；视图交互变化(input) -> 数据model变更的双向绑定效果。
+```
+class MVVM {
+    constructor(options) {
+        // 当new该类时，参数就会传到构造函数中 options就是el  data computed ...
+        this.$el = options.el; // 创建一个当前实例$el
+        this.$data = options.data;
+        // 判断根元素是否存在 <div id='app'></div> =>  编译模板
+        if (this.$el) {
+            // 把data里的数据 全部转化成用Object.defineProperty来定义
+            new Observer(this.$data);
+            new Compiler(this.$el, this);
+        }
+    }
+}
+```
+```
+注意：这样有个问题? 
+在开发中是能通过实例+属性（vm.a）来获取数据，而我们实现的MVVM获取数据要通过myMvvm.$data.xxx来获取到数据，中间多了一个$data，这样显然不是我们想要的样子。接下来实现让实例this来代理$data数据，即可实现myMvvm.xxx获取数据和真实场景一样的操作。
+```
+
 > 数据代理
 
-从代码中可看出监听的数据对象是options.data，每次需要更新视图，则必须通过var vm = new MVVM({data:{name: 'kindeng'}}); vm._data.name = 'dmq'; 这样的方式来改变数据。
-
-显然不符合我们一开始的期望，我们所期望的调用方式应该是这样的：
-var vm = new MVVM({data: {name: 'kindeng'}}); vm.name = 'dmq';
-
-所以这里需要给MVVM实例添加一个属性代理的方法，使访问vm的属性代理为访问vm._data的属性，改造后的代码如下：这里主要还是利用了Object.defineProperty()这个方法来劫持了vm实例对象的属性的读写权，使读写vm实例的属性转成读写了vm._data的属性值，达到鱼目混珠的效果。
-数据代理就是让我们每次拿data里的数据时，不用每次都写一长串，如mvvm._data.a.b这种，我们其实可以直接写成mvvm.a.b这种显而易见的方式
+在MVVM实例上添加一个属性代理的方法，使访问myMvvm的属性代理为访问myMvvm.$data的属性。其实还是利用了Object.defineProperty()方法来劫持了myMvvm实例对象的属性。添加的代理方法如下：
+```
+// this 代理 $data
+  for (let key in data) {
+    Object.defineProperty(this, key, {
+      enumerable: true,
+      get() {
+        return this.$data[key]; // this.xxx == {}
+      },
+      set(newVal) {
+        this.$data[key] = newVal;
+      }
+    })
+  }
+```
+![图片alt](https://user-gold-cdn.xitu.io/2020/1/11/16f9367354115832?w=100&h=120&f=png&s=10286 '继续干')
 
 ### 扩展 - 实现computed
+> computed 具有缓存功能，当依赖的属性发送变化，才会更新视图变化
 ```
 function initComputed() {
-    let vm = this;
-    let computed = this.$options.computed;  // 从options上拿到computed属性   {sum: ƒ, noop: ƒ}
+    let vm = this; // 将当前this挂载到vm上
+    let computed = this.$options.computed;  // 从options上拿到computed属性
     // 得到的都是对象的key可以通过Object.keys转化为数组
-    Object.keys(computed).forEach(key => {  // key就是sum,noop
-        Object.defineProperty(vm, key, {
-            // 这里判断是computed里的key是对象还是函数
-            // 如果是函数直接就会调get方法
-            // 如果是对象的话，手动调一下get方法即可
-            // 如： sum() {return this.a + this.b;},他们获取a和b的值就会调用get方法
-            // 所以不需要new Watcher去监听变化了
+    Object.keys(computed).forEach(key => {
+        Object.defineProperty(vm, key, { // 映射到this实例上
+            // 判断是computed里的key是对象还是函数
+            // 若是函数，则直接就调get方法
+            // 若是对象，则需要手动调一下get方法
+            // 因为computed只根据依赖的属性进行触发，当获取依赖属性时，系统会自动的去调用get方法，所以就不要用Watcher去监听变化了
             get: typeof computed[key] === 'function' ? computed[key] : computed[key].get,
             set() {}
         });
     });
 }
 ```
-## 完整的仓库地址
-> http://
+### 相关问题
+- Objest.defineProperty() 有那些缺点？
+- 实现数组的一个监听？
+- Vue3 中是如何用 Proxy 实现的？
+- Vue2.x 源码中数据双向绑定大致的实现流程？
+
+![图片alt](https://user-gold-cdn.xitu.io/2020/1/11/16f936b42ecbfa9a?w=500&h=500&f=png&s=69135 'what?')
 ## 总结
+
 通过以上描述和核心代码的演示，相信小伙伴们对MVVM有重新的认识，面试中对面面试官的提问可以对答如流。希望同行的小伙伴手动敲一遍，实现一个自己MVVM，这样对其原理理解更加深入。
+
+随着日益月薪需求的不断增加，jQuery操作DOM的时代已经满足不了企业项目快速迭代的进度了。 MVVM 模式对于前端领域有着重大的意义，其核心原理：实时保证View层与Model层的数据同步,实现了双向数据绑定。减少了频繁的DOM操作，提高了页面渲染的性能，也让开发者把更多的时间放到数据的处理以及业务功能的开发上。
 ![图片alt](https://user-gold-cdn.xitu.io/2020/1/9/16f8630237583f32?w=780&h=519&f=jpeg&s=91038 '加油')
